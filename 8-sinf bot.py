@@ -11,14 +11,13 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # --- BOT TOKEN (o'zingnikini qo'y) ---
-BOT_TOKEN = "BOT_TOKENINGNI_BU_YERGA_QO'Y"
+BOT_TOKEN = "8169442989:AAG6Zn2VBvx3VO1fU6lCv--gavT2N6235nM"
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # --- KERAKLI KANALLAR ---
 REQUIRED_CHANNELS = [
     {"name": "1-kanal", "username": "@bsb_chsb_javoblari1"},
-    {"name": "2-kanal", "username": "@Matematika_6sinf_yechimi_2022"},
-    {"name": "3-kanal", "username": "@algebra_7_sinf_yechimi_2022"},
+    {"name": "2-kanal", "username": "@hamkor_informatiklar"},
 ]
 
 # --- LINKLAR ---
@@ -155,7 +154,7 @@ def webhook():
 
 # --- WEBHOOK O‘RNATISH ---
 def set_webhook():
-    webhook_url = f"https://yourappname.onrender.com/{BOT_TOKEN}"  # Domeningni yoz
+    webhook_url = f"https://8sinfbot.onrender.com/{BOT_TOKEN}"  # Domeningni yoz
     bot.remove_webhook()
     result = bot.set_webhook(url=webhook_url)
     if result:
@@ -172,3 +171,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
