@@ -4,31 +4,46 @@ import telebot
 from telebot import types
 import logging
 
-# === LOGGING ===
+# --- LOGGING ---
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# === FLASK APP ===
 app = Flask(__name__)
 
-# === BOT TOKEN ===
-BOT_TOKEN = "8169442989:AAG6Zn2VBvx3VO1fU6lCv--gavT2N6235nM"  # bu joyga tokeningni qo‘y
+# --- TOKEN ---
+BOT_TOKEN = "8169442989:AAG6Zn2VBvx3VO1fU6lCv--gavT2N6235nM"
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# === KERAKLI KANALLAR ===
-REQUIRED_CHANNELS = [
-    # {"name": "1-kanal", "username": "@bsb_chsb_javoblari1"},  
+# --- KERAKLI KANALLAR ---
+REQUIRED_CHANNELS = [ 
+    # {"name": "1-kanal", "username": "@bsb_chsb_javoblari1"},
     {"name": "2-kanal", "username": "@hamkor_informatiklar"},
-
 ]
 
-# === 8-sinf uchun linklar ===
+# --- LINKLAR ---
 LINKS = {
-    "bsb": "https://www.test-uz.ru/sor_uz.php?klass=8",
-    "chsb": "https://www.test-uz.ru/soch_uz.php?klass=8",
+    "bsb_8": "https://www.test-uz.ru/sor_uz.php?klass=8",
+    "chsb_8": "https://www.test-uz.ru/soch_uz.php?klass=8",
 }
 
-# === Obuna tekshiruvi ===
+# --- ADMIN ID ---
+ADMIN_ID = 2051084228
+
+
+# --- FOYDALANUVCHINI SAQLASH ---
+def save_user(user_id):
+    try:
+        with open("users.txt", "r") as f:
+            users = f.read().splitlines()
+    except FileNotFoundError:
+        users = []
+    if str(user_id) not in users:
+        users.append(str(user_id))
+        with open("users.txt", "w") as f:
+            f.write("\n".join(users))
+
+
+# --- OBUNA TEKSHIRISH ---
 def check_subscription_status(user_id):
     not_subscribed = []
     for channel in REQUIRED_CHANNELS:
@@ -41,104 +56,135 @@ def check_subscription_status(user_id):
     return not_subscribed
 
 
+# --- OBUNA TUGMALARI ---
 def subscription_buttons(not_subscribed=None):
     markup = types.InlineKeyboardMarkup()
-    channels = REQUIRED_CHANNELS if not_subscribed is None else [c for c in REQUIRED_CHANNELS if c['name'] in not_subscribed]
+    channels = REQUIRED_CHANNELS if not_subscribed is None else [
+        c for c in REQUIRED_CHANNELS if c['name'] in not_subscribed
+    ]
     for channel in channels:
         markup.add(types.InlineKeyboardButton(channel['name'], url=f"https://t.me/{channel['username'][1:]}"))
     markup.add(types.InlineKeyboardButton("✅ Tekshirish", callback_data="check_subs"))
     return markup
 
 
-# === Asosiy menyu (faqat 2 tugma) ===
-def main_menu_markup():
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+# --- OBUNA HOLATINI TEKSHIRISH ---
+def check_user_subscriptions(message_or_call):
+    user_id = message_or_call.from_user.id
+    chat_id = message_or_call.message.chat.id if hasattr(message_or_call, "message") else message_or_call.chat.id
+    not_subscribed = check_subscription_status(user_id)
+    if not_subscribed:
+        msg = "❌ Siz quyidagi kanallarga obuna bo‘lmagansiz:\n"
+        msg += "\n".join(f"• {name}" for name in not_subscribed)
+        msg += "\n\nIltimos, obuna bo‘ling va keyin tekshirib ko‘ring."
+        markup = subscription_buttons(not_subscribed)
+        if hasattr(message_or_call, "message"):  # callback
+            bot.answer_callback_query(message_or_call.id, "Obuna bo'lish kerak", show_alert=True)
+            bot.edit_message_text(chat_id=chat_id, message_id=message_or_call.message.message_id, text=msg, reply_markup=markup)
+        else:
+            bot.send_message(chat_id, msg, reply_markup=markup)
+        return False
+    return True
+
+
+# --- ASOSIY MENYU ---
+def main_menu():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add(
-        types.KeyboardButton("📚 8-sinf BSB"),
-        types.KeyboardButton("❗️ 8-sinf CHSB")
+        types.KeyboardButton("BSB JAVOBLARI✅"),
+        types.KeyboardButton("CHSB JAVOBLARI📎")
     )
     return markup
 
 
-# === START komandasi ===
+# --- /start ---
 @bot.message_handler(commands=['start'])
 def start_handler(message):
     user_id = message.from_user.id
-    not_subscribed = check_subscription_status(user_id)
+    save_user(user_id)
+    user_name = message.from_user.first_name
 
-    if not_subscribed:
-        msg = "❌ Iltimos, quyidagi kanallarga obuna bo‘ling 👇"
-        markup = subscription_buttons(not_subscribed)
-        bot.send_message(message.chat.id, msg, reply_markup=markup)
-    else:
-        bot.send_message(
-            message.chat.id,
-            "✅ Obuna tekshirildi! Endi 8-sinf BSB yoki CHSB tanlang:",
-            reply_markup=main_menu_markup()
-        )
+    welcome = f"""👋 Salom {user_name}!
+Botimizga xush kelibsiz 🎉  
+
+Bu bot **faqat 8-sinf uchun** mo‘ljallangan.
+
+📚 BSB va ❗️ CHSB javoblarini olish uchun, avval quyidagi kanallarga obuna bo‘ling va “Tekshirish” tugmasini bosing ⬇️"""
+    bot.send_message(message.chat.id, welcome, reply_markup=subscription_buttons())
 
 
-# === Callback: obunani qayta tekshirish ===
+# --- OBUNANI TEKSHIRISH CALLBACK ---
 @bot.callback_query_handler(func=lambda call: call.data == "check_subs")
-def check_subs_callback(call):
+def check_subs(call):
     user_id = call.from_user.id
     not_subscribed = check_subscription_status(user_id)
-
     if not_subscribed:
-        msg = "❌ Hali quyidagi kanallarga obuna bo‘lmadingiz:\n"
-        msg += "\n".join(f"• {ch}" for ch in not_subscribed)
+        msg = "❌ Quyidagi kanallarga obuna bo‘lmagansiz:\n"
+        msg += "\n".join(f"• {name}" for name in not_subscribed)
         markup = subscription_buttons(not_subscribed)
-        bot.answer_callback_query(call.id, "Obuna kerak", show_alert=True)
+        bot.answer_callback_query(call.id, "Obuna emassiz", show_alert=True)
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=msg, reply_markup=markup)
     else:
-        bot.answer_callback_query(call.id)
-        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="✅ Obuna tasdiqlandi!")
-        bot.send_message(call.message.chat.id, "Endi 8-sinf variantini tanlang 👇", reply_markup=main_menu_markup())
+        bot.answer_callback_query(call.id, "Obuna tekshirildi ✅")
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                              text="✅ Siz barcha kanallarga obuna bo‘lgansiz!\nEndi botdan foydalanishingiz mumkin 🎉")
+        bot.send_message(call.message.chat.id, "Asosiy menyu:", reply_markup=main_menu())
 
 
-# === Tugma bosilganda link yuborish ===
-@bot.message_handler(func=lambda message: message.text in ["BSB JAVOBLARI✅", "CHSB JAVOBLARI📎"])
-def send_link(message):
-    user_id = message.from_user.id
-    not_subscribed = check_subscription_status(user_id)
+# --- BSB 8-sinf ---
+@bot.message_handler(func=lambda m: m.text == "BSB JAVOBLARI✅")
+def bsb_8_handler(message):
+    if not check_user_subscriptions(message): return
+    bot.send_message(message.chat.id, f"📚 8-sinf BSB javoblari:\n{LINKS['bsb_8']}")
 
-    if not_subscribed:
-        msg = "❌ Iltimos, quyidagi kanallarga obuna bo‘ling 👇"
-        markup = subscription_buttons(not_subscribed)
-        bot.send_message(message.chat.id, msg, reply_markup=markup)
+
+# --- CHSB 8-sinf ---
+@bot.message_handler(func=lambda m: m.text == "CHSB JAVOBLARI📎")
+def chsb_8_handler(message):
+    if not check_user_subscriptions(message): return
+    bot.send_message(message.chat.id, f"❗️ 8-sinf CHSB javoblari:\n{LINKS['chsb_8']}")
+
+
+# --- /stats ---
+@bot.message_handler(commands=['stats'])
+def stats(message):
+    if message.from_user.id != ADMIN_ID:
+        bot.send_message(message.chat.id, "Sizda ruxsat yo‘q ❌")
         return
+    try:
+        with open("users.txt", "r") as f:
+            users = f.read().splitlines()
+    except FileNotFoundError:
+        users = []
+    bot.send_message(message.chat.id, f"👥 Umumiy foydalanuvchilar: {len(users)}")
 
-    if "BSB" in message.text:
-        bot.send_message(message.chat.id, f"📘 8-sinf BSB javoblari: {LINKS['bsb']}")
-    else:
-        bot.send_message(message.chat.id, f"📗 8-sinf CHSB javoblari: {LINKS['chsb']}")
 
-
-# === WEBHOOK yo‘lga qo‘yish ===
+# --- WEBHOOK ---
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
-    json_str = request.get_data().decode("utf-8")
-    update = telebot.types.Update.de_json(json_str)
+    update = telebot.types.Update.de_json(request.get_data().decode("utf-8"))
     bot.process_new_updates([update])
     return jsonify({"status": "ok"})
 
 
+# --- WEBHOOK O‘RNATISH ---
 def set_webhook():
-    webhook_url = f"https://eightsinfbot.onrender.com/{BOT_TOKEN}"  # bu joyga Render domeningni yoz
+    webhook_url = f"https://eightsinfbot.onrender.com/{BOT_TOKEN}"  # <-- o'z domeningni yoz
     bot.remove_webhook()
     result = bot.set_webhook(url=webhook_url)
     if result:
         logger.info(f"Webhook set to {webhook_url}")
     else:
-        logger.error("Webhook set failed")
+        logger.error("Webhook o‘rnatilmadi")
 
 
+# --- MAIN ---
 def main():
     set_webhook()
     port = int(os.environ.get("PORT", 5000))
+    logger.info(f"Server {port}-portda ishga tushdi")
     app.run(host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":
     main()
-
