@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # === BOT TOKEN ===
-BOT_TOKEN = "8169442989:AAG6Zn2VBvx3VO1fU6lCv--gavT2N6235nM"  # bu joyga tokeningni qo‘y
+BOT_TOKEN = "8199437478:AAGYuqU0npc5tmkjEEMnPcSc3wqi4T0_ifo"  # bu joyga tokeningni qo‘y
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # === KERAKLI KANALLAR ===
@@ -142,3 +142,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
