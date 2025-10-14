@@ -52,8 +52,20 @@ def save_user(user_id, first_name):
 # --- XABAR SONINI OSHIRISH ---
 def increase_message_count(user_id):
     try:
+       def save_user(user_id, first_name):
+    try:
         with open("users.txt", "r") as f:
             users = [line.strip().split(",") for line in f.read().splitlines()]
+    except FileNotFoundError:
+        users = []
+
+    existing = [u for u in users if u[0] == str(user_id)]
+
+    if not existing:
+        today = datetime.now().strftime("%Y-%m-%d")
+        with open("users.txt", "a") as f:  # ⚠️ "a" — qo‘shish rejimi, o‘chirmaydi
+            f.write(f"{user_id},{first_name},{today},0\n")
+
     except FileNotFoundError:
         return
 
@@ -174,6 +186,9 @@ def chsb_8_handler(message):
 # --- FOYDALANUVCHI HAR QANDAY XABAR YUBORGANDA SONI OSHIRILADI ---
 @bot.message_handler(content_types=['text'])
 def message_counter(message):
+    # /start, /stats va boshqa komandalarni o'tkazib yuborish
+    if message.text.startswith("/"):
+        return
     increase_message_count(message.from_user.id)
 
 
@@ -237,4 +252,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
