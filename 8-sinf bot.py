@@ -5,13 +5,13 @@ from telebot import types
 import logging
 
 # --- LOGGING ---
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# --- BOT TOKEN (o'zingnikini qo'y) ---
-BOT_TOKEN = "8169442989:AAG6Zn2VBvx3VO1fU6lCv--gavT2N6235nM"
+# --- BOT TOKEN ---
+BOT_TOKEN = "8169442989:AAG6Zn2VBvx3VO1fU6lCv--gavT2N6235nM"  # <-- O'zingning tokeningni qo'y
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # --- KERAKLI KANALLAR ---
@@ -36,10 +36,12 @@ def save_user(user_id):
             users = f.read().splitlines()
     except FileNotFoundError:
         users = []
+
     if str(user_id) not in users:
         users.append(str(user_id))
         with open("users.txt", "w") as f:
             f.write("\n".join(users))
+
 
 # --- OBUNA HOLATINI TEKSHIRISH ---
 def check_subscription_status(user_id):
@@ -53,6 +55,7 @@ def check_subscription_status(user_id):
             not_subscribed.append(channel["name"])
     return not_subscribed
 
+
 # --- OBUNA TUGMALARI ---
 def subscription_buttons(not_subscribed=None):
     markup = types.InlineKeyboardMarkup()
@@ -64,17 +67,19 @@ def subscription_buttons(not_subscribed=None):
     markup.add(types.InlineKeyboardButton("✅ Tekshirish", callback_data="check_subs"))
     return markup
 
-# --- OBUNA TEKSHIRISH ---
+
+# --- OBUNANI TEKSHIRISH FUNKSIYASI ---
 def check_user_subscriptions(message_or_call):
     user_id = message_or_call.from_user.id
     chat_id = message_or_call.message.chat.id if hasattr(message_or_call, "message") else message_or_call.chat.id
+
     not_subscribed = check_subscription_status(user_id)
     if not_subscribed:
         msg = "❌ Siz quyidagi kanallarga obuna bo‘lmagansiz:\n"
         msg += "\n".join(f"• {name}" for name in not_subscribed)
         msg += "\n\nIltimos, obuna bo‘ling va keyin tekshirib ko‘ring."
         markup = subscription_buttons(not_subscribed)
-        if hasattr(message_or_call, "message"):  # callback
+        if hasattr(message_or_call, "message"):
             bot.answer_callback_query(message_or_call.id, "Obuna bo'lish kerak", show_alert=True)
             bot.edit_message_text(chat_id=chat_id, message_id=message_or_call.message.message_id, text=msg, reply_markup=markup)
         else:
@@ -82,11 +87,14 @@ def check_user_subscriptions(message_or_call):
         return False
     return True
 
+
 # --- ASOSIY MENYU ---
-def main_menu():
+def main_menu_markup():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(types.KeyboardButton("BSB JAVOBLARI✅"), types.KeyboardButton("CHSB JAVOBLARI📎"))
+    markup.add(types.KeyboardButton("📚 BSB JAVOBLARI"), types.KeyboardButton("❗️ CHSB JAVOBLARI"))
+    markup.add(types.KeyboardButton("📬 Reklama xizmati"))
     return markup
+
 
 # --- /start ---
 @bot.message_handler(commands=['start'])
@@ -100,8 +108,9 @@ Botimizga xush kelibsiz 🎉
 
 Bu bot **faqat 8-sinf uchun** mo‘ljallangan.
 
-📚 BSB va ❗️ CHSB javoblarini olish uchun, avval quyidagi kanallarga obuna bo‘ling va “Tekshirish” tugmasini bosing ⬇️"""
+📚 BSB va ❗️ CHSB javoblarini olish uchun, quyidagi kanallarga obuna bo‘ling va “Tekshirish” tugmasini bosing ⬇️"""
     bot.send_message(message.chat.id, welcome, reply_markup=subscription_buttons())
+
 
 # --- OBUNANI TEKSHIRISH CALLBACK ---
 @bot.callback_query_handler(func=lambda call: call.data == "check_subs")
@@ -118,19 +127,29 @@ def check_subs(call):
         bot.answer_callback_query(call.id, "Obuna tekshirildi ✅")
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                               text="✅ Siz barcha kanallarga obuna bo‘lgansiz!\nEndi botdan foydalanishingiz mumkin 🎉")
-        bot.send_message(call.message.chat.id, "Asosiy menyu:", reply_markup=main_menu())
+        bot.send_message(call.message.chat.id, "Asosiy menyu:", reply_markup=main_menu_markup())
+
 
 # --- BSB 8-sinf ---
-@bot.message_handler(func=lambda m: m.text == "📚 BSB 8-sinf")
-def bsb_8_handler(message):
+@bot.message_handler(func=lambda m: m.text == "📚 BSB JAVOBLARI")
+def bsb_handler(message):
     if not check_user_subscriptions(message): return
     bot.send_message(message.chat.id, f"📚 8-sinf BSB javoblari:\n{LINKS['bsb_8']}")
 
+
 # --- CHSB 8-sinf ---
-@bot.message_handler(func=lambda m: m.text == "❗️ CHSB 8-sinf")
-def chsb_8_handler(message):
+@bot.message_handler(func=lambda m: m.text == "❗️ CHSB JAVOBLARI")
+def chsb_handler(message):
     if not check_user_subscriptions(message): return
     bot.send_message(message.chat.id, f"❗️ 8-sinf CHSB javoblari:\n{LINKS['chsb_8']}")
+
+
+# --- Reklama tugmasi ---
+@bot.message_handler(func=lambda m: m.text == "📬 Reklama xizmati")
+def reklama_handler(message):
+    if not check_user_subscriptions(message): return
+    bot.send_message(message.chat.id, "📬 Reklama uchun admin bilan bog‘laning: @BAR_xn")
+
 
 # --- /stats (admin uchun) ---
 @bot.message_handler(commands=['stats'])
@@ -145,16 +164,18 @@ def stats(message):
         users = []
     bot.send_message(message.chat.id, f"👥 Umumiy foydalanuvchilar: {len(users)}")
 
-# --- WEBHOOK ---
+
+# --- WEBHOOK ROUTE ---
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
     update = telebot.types.Update.de_json(request.get_data().decode("utf-8"))
     bot.process_new_updates([update])
     return jsonify({"status": "ok"})
 
+
 # --- WEBHOOK O‘RNATISH ---
 def set_webhook():
-    webhook_url = f"https://8sinfbot.onrender.com/{BOT_TOKEN}"  # Domeningni yoz
+    webhook_url = f"https://8sinfbot.onrender.com/{BOT_TOKEN}"  # domeningni o'zgartir
     bot.remove_webhook()
     result = bot.set_webhook(url=webhook_url)
     if result:
@@ -162,13 +183,17 @@ def set_webhook():
     else:
         logger.error("Webhook o‘rnatilmadi")
 
-# --- MAIN ---
+
+# --- MAIN FUNKSIYA ---
 def main():
     set_webhook()
     port = int(os.environ.get("PORT", 5000))
     logger.info(f"Server {port}-portda ishga tushdi")
-    app.run(host="0.0.0.0", port=port)
+    try:
+        app.run(host="0.0.0.0", port=port)
+    except Exception as e:
+        logger.error(f"Serverda xato: {e}")
+
 
 if __name__ == "__main__":
     main()
-
