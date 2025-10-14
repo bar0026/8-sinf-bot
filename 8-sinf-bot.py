@@ -16,7 +16,7 @@ bot = telebot.TeleBot(BOT_TOKEN)
 
 # --- KERAKLI KANALLAR ---
 REQUIRED_CHANNELS = [ 
-    # {"name": "1-kanal", "username": "@bsb_chsb_javoblari1"},
+    {"name": "1-kanal", "username": "@bsb_chsb_javoblari1"},
     {"name": "2-kanal", "username": "@hamkor_informatiklar"},
 ]
 
@@ -188,3 +188,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
