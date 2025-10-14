@@ -16,7 +16,7 @@ BOT_TOKEN = "8169442989:AAGDoHlUu6o54zadUYOemWX1k0VOsqZbd_c"
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # --- KERAKLI KANALLAR ---
-REQUIRED_CHANNELS = [ 
+REQUIRED_CHANNELS = [
     {"name": "1-kanal", "username": "@bsb_chsb_javoblari1"},
     {"name": "2-kanal", "username": "@hamkor_informatiklar"},
 ]
@@ -30,8 +30,13 @@ LINKS = {
 # --- ADMIN ID ---
 ADMIN_ID = 2051084228
 
+# --- USERS.TXT YARATISH ---
+if not os.path.exists("users.txt"):
+    with open("users.txt", "w") as f:
+        f.write("")
 
-# --- FOYDALANUVCHINI SAQLASH (sana va xabarlar bilan) ---
+
+# --- FOYDALANUVCHINI SAQLASH ---
 def save_user(user_id, first_name):
     try:
         with open("users.txt", "r") as f:
@@ -40,43 +45,31 @@ def save_user(user_id, first_name):
         users = []
 
     existing = [u for u in users if u[0] == str(user_id)]
-
     if not existing:
         today = datetime.now().strftime("%Y-%m-%d")
-        users.append([str(user_id), first_name, today, "0"])  # id, ism, sana, msg_count
-
-        with open("users.txt", "w") as f:
-            f.write("\n".join([",".join(u) for u in users]))
+        with open("users.txt", "a") as f:  # 🔥 eski ma’lumotni o‘chirmaydi
+            f.write(f"{user_id},{first_name},{today},0\n")
 
 
 # --- XABAR SONINI OSHIRISH ---
 def increase_message_count(user_id):
     try:
-       def save_user(user_id, first_name):
-    try:
         with open("users.txt", "r") as f:
             users = [line.strip().split(",") for line in f.read().splitlines()]
-    except FileNotFoundError:
-        users = []
-
-    existing = [u for u in users if u[0] == str(user_id)]
-
-    if not existing:
-        today = datetime.now().strftime("%Y-%m-%d")
-        with open("users.txt", "a") as f:  # ⚠️ "a" — qo‘shish rejimi, o‘chirmaydi
-            f.write(f"{user_id},{first_name},{today},0\n")
-
     except FileNotFoundError:
         return
 
     updated = []
+    found = False
     for u in users:
         if u[0] == str(user_id):
             u[3] = str(int(u[3]) + 1)
+            found = True
         updated.append(u)
 
-    with open("users.txt", "w") as f:
-        f.write("\n".join([",".join(u) for u in updated]))
+    if found:
+        with open("users.txt", "w") as f:
+            f.write("\n".join([",".join(u) for u in updated]))
 
 
 # --- OBUNA TEKSHIRISH ---
@@ -114,8 +107,8 @@ def check_user_subscriptions(message_or_call):
         msg += "\n".join(f"• {name}" for name in not_subscribed)
         msg += "\n\nIltimos, obuna bo‘ling va keyin tekshirib ko‘ring."
         markup = subscription_buttons(not_subscribed)
-        if hasattr(message_or_call, "message"):  # callback
-            bot.answer_callback_query(message_or_call.id, "Obuna bo'lish kerak", show_alert=True)
+        if hasattr(message_or_call, "message"):
+            bot.answer_callback_query(message_or_call.id, "Obuna bo‘lish kerak", show_alert=True)
             bot.edit_message_text(chat_id=chat_id, message_id=message_or_call.message.message_id, text=msg, reply_markup=markup)
         else:
             bot.send_message(chat_id, msg, reply_markup=markup)
@@ -167,7 +160,7 @@ def check_subs(call):
         bot.send_message(call.message.chat.id, "Asosiy menyu:", reply_markup=main_menu())
 
 
-# --- BSB 8-sinf ---
+# --- BSB ---
 @bot.message_handler(func=lambda m: m.text == "BSB JAVOBLARI✅")
 def bsb_8_handler(message):
     if not check_user_subscriptions(message): return
@@ -175,7 +168,7 @@ def bsb_8_handler(message):
     bot.send_message(message.chat.id, f"📚 8-sinf BSB javoblari:\n{LINKS['bsb_8']}")
 
 
-# --- CHSB 8-sinf ---
+# --- CHSB ---
 @bot.message_handler(func=lambda m: m.text == "CHSB JAVOBLARI📎")
 def chsb_8_handler(message):
     if not check_user_subscriptions(message): return
@@ -183,16 +176,7 @@ def chsb_8_handler(message):
     bot.send_message(message.chat.id, f"❗️ 8-sinf CHSB javoblari:\n{LINKS['chsb_8']}")
 
 
-# --- FOYDALANUVCHI HAR QANDAY XABAR YUBORGANDA SONI OSHIRILADI ---
-@bot.message_handler(content_types=['text'])
-def message_counter(message):
-    # /start, /stats va boshqa komandalarni o'tkazib yuborish
-    if message.text.startswith("/"):
-        return
-    increase_message_count(message.from_user.id)
-
-
-# --- /stats (KENGAYTIRILGAN) ---
+# --- /stats ---
 @bot.message_handler(commands=['stats'])
 def stats_handler(message):
     if message.from_user.id != ADMIN_ID:
@@ -201,17 +185,15 @@ def stats_handler(message):
 
     try:
         with open("users.txt", "r") as f:
-            users = [line.strip().split(",") for line in f.read().splitlines()]
+            users = [line.strip().split(",") for line in f.read().splitlines() if line]
     except FileNotFoundError:
         users = []
 
     total_users = len(users)
     today = datetime.now().strftime("%Y-%m-%d")
     today_new = len([u for u in users if u[2] == today])
-
-    # Eng faol foydalanuvchilar
     active_users = sorted(users, key=lambda x: int(x[3]), reverse=True)[:5]
-    top_list = "\n".join([f"{i+1}. {u[1]} — {u[3]} xabar" for i, u in enumerate(active_users)]) or "Hozircha ma'lumot yo'q"
+    top_list = "\n".join([f"{i+1}. {u[1]} — {u[3]} xabar" for i, u in enumerate(active_users)]) or "Hozircha ma'lumot yo‘q"
 
     stats_text = (
         f"📊 <b>Statistika:</b>\n"
@@ -219,8 +201,15 @@ def stats_handler(message):
         f"🆕 Bugun qo‘shilganlar: <b>{today_new}</b>\n\n"
         f"🔥 Eng faol foydalanuvchilar:\n{top_list}"
     )
-
     bot.send_message(message.chat.id, stats_text, parse_mode="HTML")
+
+
+# --- BARCHA XABARLARDA / KOMANDA TEKSHIRISH ---
+@bot.message_handler(content_types=['text'])
+def message_counter(message):
+    if message.text.startswith("/"):
+        return
+    increase_message_count(message.from_user.id)
 
 
 # --- WEBHOOK ---
@@ -233,7 +222,7 @@ def webhook():
 
 # --- WEBHOOK O‘RNATISH ---
 def set_webhook():
-    webhook_url = f"https://eightsinfbot.onrender.com/{BOT_TOKEN}"  # <-- o'z domeningni yoz
+    webhook_url = f"https://eightsinfbot.onrender.com/{BOT_TOKEN}"  # ← bu joyda Render app nomini yoz
     bot.remove_webhook()
     result = bot.set_webhook(url=webhook_url)
     if result:
@@ -252,5 +241,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
