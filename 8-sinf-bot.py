@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify
 import telebot
 from telebot import types
 import logging
+from datetime import datetime
 
 # --- LOGGING ---
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -30,17 +31,40 @@ LINKS = {
 ADMIN_ID = 2051084228
 
 
-# --- FOYDALANUVCHINI SAQLASH ---
-def save_user(user_id):
+# --- FOYDALANUVCHINI SAQLASH (sana va xabarlar bilan) ---
+def save_user(user_id, first_name):
     try:
         with open("users.txt", "r") as f:
-            users = f.read().splitlines()
+            users = [line.strip().split(",") for line in f.read().splitlines()]
     except FileNotFoundError:
         users = []
-    if str(user_id) not in users:
-        users.append(str(user_id))
+
+    existing = [u for u in users if u[0] == str(user_id)]
+
+    if not existing:
+        today = datetime.now().strftime("%Y-%m-%d")
+        users.append([str(user_id), first_name, today, "0"])  # id, ism, sana, msg_count
+
         with open("users.txt", "w") as f:
-            f.write("\n".join(users))
+            f.write("\n".join([",".join(u) for u in users]))
+
+
+# --- XABAR SONINI OSHIRISH ---
+def increase_message_count(user_id):
+    try:
+        with open("users.txt", "r") as f:
+            users = [line.strip().split(",") for line in f.read().splitlines()]
+    except FileNotFoundError:
+        return
+
+    updated = []
+    for u in users:
+        if u[0] == str(user_id):
+            u[3] = str(int(u[3]) + 1)
+        updated.append(u)
+
+    with open("users.txt", "w") as f:
+        f.write("\n".join([",".join(u) for u in updated]))
 
 
 # --- OBUNA TEKSHIRISH ---
@@ -101,7 +125,7 @@ def main_menu():
 @bot.message_handler(commands=['start'])
 def start_handler(message):
     user_id = message.from_user.id
-    save_user(user_id)
+    save_user(user_id, message.from_user.first_name)
     user_name = message.from_user.first_name
 
     welcome = f"""👋 Salom {user_name}!
@@ -135,6 +159,7 @@ def check_subs(call):
 @bot.message_handler(func=lambda m: m.text == "BSB JAVOBLARI✅")
 def bsb_8_handler(message):
     if not check_user_subscriptions(message): return
+    increase_message_count(message.from_user.id)
     bot.send_message(message.chat.id, f"📚 8-sinf BSB javoblari:\n{LINKS['bsb_8']}")
 
 
@@ -142,21 +167,45 @@ def bsb_8_handler(message):
 @bot.message_handler(func=lambda m: m.text == "CHSB JAVOBLARI📎")
 def chsb_8_handler(message):
     if not check_user_subscriptions(message): return
+    increase_message_count(message.from_user.id)
     bot.send_message(message.chat.id, f"❗️ 8-sinf CHSB javoblari:\n{LINKS['chsb_8']}")
 
 
-# --- /stats ---
+# --- FOYDALANUVCHI HAR QANDAY XABAR YUBORGANDA SONI OSHIRILADI ---
+@bot.message_handler(content_types=['text'])
+def message_counter(message):
+    increase_message_count(message.from_user.id)
+
+
+# --- /stats (KENGAYTIRILGAN) ---
 @bot.message_handler(commands=['stats'])
-def stats(message):
+def stats_handler(message):
     if message.from_user.id != ADMIN_ID:
         bot.send_message(message.chat.id, "Sizda ruxsat yo‘q ❌")
         return
+
     try:
         with open("users.txt", "r") as f:
-            users = f.read().splitlines()
+            users = [line.strip().split(",") for line in f.read().splitlines()]
     except FileNotFoundError:
         users = []
-    bot.send_message(message.chat.id, f"👥 Umumiy foydalanuvchilar: {len(users)}")
+
+    total_users = len(users)
+    today = datetime.now().strftime("%Y-%m-%d")
+    today_new = len([u for u in users if u[2] == today])
+
+    # Eng faol foydalanuvchilar
+    active_users = sorted(users, key=lambda x: int(x[3]), reverse=True)[:5]
+    top_list = "\n".join([f"{i+1}. {u[1]} — {u[3]} xabar" for i, u in enumerate(active_users)]) or "Hozircha ma'lumot yo'q"
+
+    stats_text = (
+        f"📊 <b>Statistika:</b>\n"
+        f"👥 Umumiy foydalanuvchilar: <b>{total_users}</b>\n"
+        f"🆕 Bugun qo‘shilganlar: <b>{today_new}</b>\n\n"
+        f"🔥 Eng faol foydalanuvchilar:\n{top_list}"
+    )
+
+    bot.send_message(message.chat.id, stats_text, parse_mode="HTML")
 
 
 # --- WEBHOOK ---
@@ -188,4 +237,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
