@@ -15,7 +15,7 @@ app = Flask(__name__)
 BOT_TOKEN = "8169442989:AAGDoHlUu6o54zadUYOemWX1k0VOsqZbd_c"
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# --- KERAKLI KANALLAR ---
+# --- KANALLAR ---
 REQUIRED_CHANNELS = [
     {"name": "1-kanal", "username": "@bsb_chsb_javoblari1"},
     {"name": "2-kanal", "username": "@bsb_chsb_8_sinf_uchun"},
@@ -30,7 +30,7 @@ LINKS = {
 # --- ADMIN ID ---
 ADMIN_ID = 2051084228
 
-# --- USERS.TXT YARATISH ---
+# --- USERS.TXT ---
 if not os.path.exists("users.txt"):
     with open("users.txt", "w") as f:
         f.write("")
@@ -43,13 +43,12 @@ def save_user(user_id, first_name):
     except FileNotFoundError:
         users = []
 
-    existing = [u for u in users if u[0] == str(user_id)]
-    if not existing:
+    if not any(u[0] == str(user_id) for u in users):
         today = datetime.now().strftime("%Y-%m-%d")
-        with open("users.txt", "a") as f:  # eski ma’lumotni o‘chirmaydi
+        with open("users.txt", "a") as f:
             f.write(f"{user_id},{first_name},{today},0\n")
 
-# --- XABAR SONINI OSHIRISH ---
+# --- XABAR SONI ---
 def increase_message_count(user_id):
     try:
         with open("users.txt", "r") as f:
@@ -58,16 +57,12 @@ def increase_message_count(user_id):
         return
 
     updated = []
-    found = False
     for u in users:
         if u[0] == str(user_id):
             u[3] = str(int(u[3]) + 1)
-            found = True
         updated.append(u)
-
-    if found:
-        with open("users.txt", "w") as f:
-            f.write("\n".join([",".join(u) for u in updated]))
+    with open("users.txt", "w") as f:
+        f.write("\n".join([",".join(u) for u in updated]))
 
 # --- OBUNA TEKSHIRISH ---
 def check_subscription_status(user_id):
@@ -84,15 +79,13 @@ def check_subscription_status(user_id):
 # --- OBUNA TUGMALARI ---
 def subscription_buttons(not_subscribed=None):
     markup = types.InlineKeyboardMarkup()
-    channels = REQUIRED_CHANNELS if not_subscribed is None else [
-        c for c in REQUIRED_CHANNELS if c['name'] in not_subscribed
-    ]
+    channels = REQUIRED_CHANNELS if not_subscribed is None else [c for c in REQUIRED_CHANNELS if c['name'] in not_subscribed]
     for channel in channels:
         markup.add(types.InlineKeyboardButton(channel['name'], url=f"https://t.me/{channel['username'][1:]}"))
     markup.add(types.InlineKeyboardButton("✅ Tekshirish", callback_data="check_subs"))
     return markup
 
-# --- OBUNA HOLATINI TEKSHIRISH ---
+# --- OBUNA TEKSHIRISH CALLBACK ---
 def check_user_subscriptions(message_or_call):
     user_id = message_or_call.from_user.id
     chat_id = message_or_call.message.chat.id if hasattr(message_or_call, "message") else message_or_call.chat.id
@@ -110,38 +103,25 @@ def check_user_subscriptions(message_or_call):
         return False
     return True
 
-# --- ASOSIY MENYU ---
+# --- MENYU ---
 def main_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(
-        types.KeyboardButton("BSB JAVOBLARI✅"),
-        types.KeyboardButton("CHSB JAVOBLARI📎")
-    )
+    markup.add(types.KeyboardButton("BSB JAVOBLARI✅"), types.KeyboardButton("CHSB JAVOBLARI📎"))
     return markup
 
-# --- ADMIN PANEL MENYU ---
 def admin_panel_markup():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(
-        types.KeyboardButton("📣 Xabar yuborish"),
-        types.KeyboardButton("📊 Statistika"),
-        types.KeyboardButton("🏠 Asosiy menyu")
-    )
+    markup.add(types.KeyboardButton("📣 Xabar yuborish"), types.KeyboardButton("📊 Statistika"), types.KeyboardButton("🏠 Asosiy menyu"))
     return markup
 
 # --- /start ---
 @bot.message_handler(commands=['start'])
 def start_handler(message):
-    user_id = message.from_user.id
-    save_user(user_id, message.from_user.first_name)
-    user_name = message.from_user.first_name
+    save_user(message.from_user.id, message.from_user.first_name)
+    welcome = f"""👋 Salom {message.from_user.first_name}!
+Botimizga xush kelibsiz 🎉
 
-    welcome = f"""👋 Salom {user_name}!
-Botimizga xush kelibsiz 🎉  
-
-Bu bot **faqat 8-sinf uchun** mo‘ljallangan.
-
-📚 BSB va ❗️ CHSB javoblarini olish uchun, avval quyidagi kanallarga obuna bo‘ling va “Tekshirish” tugmasini bosing ⬇️"""
+📚 BSB va ❗️ CHSB javoblari uchun, avval kanallarga obuna bo‘ling va “✅ Tekshirish” tugmasini bosing ⬇️"""
     bot.send_message(message.chat.id, welcome, reply_markup=subscription_buttons())
 
 # --- /admin ---
@@ -152,15 +132,46 @@ def admin_panel(message):
         return
     bot.send_message(message.chat.id, "🔐 Admin panel:", reply_markup=admin_panel_markup())
 
-# --- Xabar yuborish ---
-@bot.message_handler(func=lambda m: m.text == "📣 Xabar yuborish")
-def broadcast_message_start(message):
-    if message.from_user.id != ADMIN_ID:
-        return
-    msg = bot.send_message(message.chat.id, "📢 Yuboriladigan xabarni yozing:")
-    bot.register_next_step_handler(msg, broadcast_message_send)
+# --- CALLBACK: Tekshirish ---
+@bot.callback_query_handler(func=lambda call: call.data == "check_subs")
+def check_subs(call):
+    user_id = call.from_user.id
+    chat_id = call.message.chat.id
+    not_subscribed = check_subscription_status(user_id)
+    if not_subscribed:
+        msg = "❌ Quyidagi kanallarga obuna bo‘lmagansiz:\n"
+        msg += "\n".join(f"• {name}" for name in not_subscribed)
+        markup = subscription_buttons(not_subscribed)
+        bot.answer_callback_query(call.id, "Siz obuna emassiz", show_alert=True)
+        bot.edit_message_text(chat_id=chat_id, message_id=call.message.message_id, text=msg, reply_markup=markup)
+    else:
+        bot.answer_callback_query(call.id, "Obuna tekshirildi ✅")
+        bot.edit_message_text(chat_id=chat_id, message_id=call.message.message_id,
+                              text="✅ Siz barcha kanallarga obuna bo‘lgansiz!\nEndi botdan foydalanishingiz mumkin 🎉")
+        bot.send_message(chat_id, "Asosiy menyu:", reply_markup=main_menu())
 
-def broadcast_message_send(message):
+# --- BSB ---
+@bot.message_handler(func=lambda m: m.text == "BSB JAVOBLARI✅")
+def bsb_handler(message):
+    if not check_user_subscriptions(message): return
+    increase_message_count(message.from_user.id)
+    bot.send_message(message.chat.id, f"📚 8-sinf BSB javoblari:\n{LINKS['bsb_8']}")
+
+# --- CHSB ---
+@bot.message_handler(func=lambda m: m.text == "CHSB JAVOBLARI📎")
+def chsb_handler(message):
+    if not check_user_subscriptions(message): return
+    increase_message_count(message.from_user.id)
+    bot.send_message(message.chat.id, f"❗️ 8-sinf CHSB javoblari:\n{LINKS['chsb_8']}")
+
+# --- Xabar yuborish (admin) ---
+@bot.message_handler(func=lambda m: m.text == "📣 Xabar yuborish")
+def broadcast_start(message):
+    if message.from_user.id != ADMIN_ID: return
+    msg = bot.send_message(message.chat.id, "📢 Yuboriladigan xabarni yozing:")
+    bot.register_next_step_handler(msg, broadcast_send)
+
+def broadcast_send(message):
     text = message.text
     try:
         with open("users.txt", "r") as f:
@@ -173,18 +184,14 @@ def broadcast_message_send(message):
         try:
             bot.send_message(user_id, text)
             sent += 1
-        except Exception:
+        except:
             continue
-
     bot.send_message(message.chat.id, f"✅ Xabar {sent} foydalanuvchiga yuborildi.")
 
-# --- /stats ---
-@bot.message_handler(commands=['stats'])
+# --- Statistika (admin) ---
+@bot.message_handler(func=lambda m: m.text == "📊 Statistika")
 def stats_handler(message):
-    if message.from_user.id != ADMIN_ID:
-        bot.send_message(message.chat.id, "Sizda ruxsat yo‘q ❌")
-        return
-
+    if message.from_user.id != ADMIN_ID: return
     try:
         with open("users.txt", "r") as f:
             users = [line.strip().split(",") for line in f.read().splitlines() if line]
@@ -213,21 +220,7 @@ def return_main_menu(message):
     else:
         bot.send_message(message.chat.id, "Asosiy menyu:", reply_markup=main_menu())
 
-# --- BSB ---
-@bot.message_handler(func=lambda m: m.text == "BSB JAVOBLARI✅")
-def bsb_8_handler(message):
-    if not check_user_subscriptions(message): return
-    increase_message_count(message.from_user.id)
-    bot.send_message(message.chat.id, f"📚 8-sinf BSB javoblari:\n{LINKS['bsb_8']}")
-
-# --- CHSB ---
-@bot.message_handler(func=lambda m: m.text == "CHSB JAVOBLARI📎")
-def chsb_8_handler(message):
-    if not check_user_subscriptions(message): return
-    increase_message_count(message.from_user.id)
-    bot.send_message(message.chat.id, f"❗️ 8-sinf CHSB javoblari:\n{LINKS['chsb_8']}")
-
-# --- BARCHA XABARLARDA / KOMANDA TEKSHIRISH ---
+# --- BARCHA XABARLARDA ---
 @bot.message_handler(content_types=['text'])
 def message_counter(message):
     if message.text.startswith("/"):
@@ -243,7 +236,7 @@ def webhook():
 
 # --- WEBHOOK O‘RNATISH ---
 def set_webhook():
-    webhook_url = f"https://eightsinfbot.onrender.com/{BOT_TOKEN}"  # ← bu joyda Render app nomini yoz
+    webhook_url = f"https://eightsinfbot.onrender.com/{BOT_TOKEN}"  # ← domeningizni yozing
     bot.remove_webhook()
     result = bot.set_webhook(url=webhook_url)
     if result:
