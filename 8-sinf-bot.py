@@ -18,6 +18,7 @@ bot = telebot.TeleBot(BOT_TOKEN)
 # --- KERAKLI KANALLAR ---
 REQUIRED_CHANNELS = [
     {"name": "1-kanal", "username": "@bsb_chsb_javoblari1"},
+    {"name": "2-kanal", "username": "@bsb_chsb_8_sinf_uchun"},
 ]
 
 # --- LINKLAR ---
@@ -34,7 +35,6 @@ if not os.path.exists("users.txt"):
     with open("users.txt", "w") as f:
         f.write("")
 
-
 # --- FOYDALANUVCHINI SAQLASH ---
 def save_user(user_id, first_name):
     try:
@@ -46,9 +46,8 @@ def save_user(user_id, first_name):
     existing = [u for u in users if u[0] == str(user_id)]
     if not existing:
         today = datetime.now().strftime("%Y-%m-%d")
-        with open("users.txt", "a") as f:  # 🔥 eski ma’lumotni o‘chirmaydi
+        with open("users.txt", "a") as f:  # eski ma’lumotni o‘chirmaydi
             f.write(f"{user_id},{first_name},{today},0\n")
-
 
 # --- XABAR SONINI OSHIRISH ---
 def increase_message_count(user_id):
@@ -70,7 +69,6 @@ def increase_message_count(user_id):
         with open("users.txt", "w") as f:
             f.write("\n".join([",".join(u) for u in updated]))
 
-
 # --- OBUNA TEKSHIRISH ---
 def check_subscription_status(user_id):
     not_subscribed = []
@@ -83,7 +81,6 @@ def check_subscription_status(user_id):
             not_subscribed.append(channel["name"])
     return not_subscribed
 
-
 # --- OBUNA TUGMALARI ---
 def subscription_buttons(not_subscribed=None):
     markup = types.InlineKeyboardMarkup()
@@ -94,7 +91,6 @@ def subscription_buttons(not_subscribed=None):
         markup.add(types.InlineKeyboardButton(channel['name'], url=f"https://t.me/{channel['username'][1:]}"))
     markup.add(types.InlineKeyboardButton("✅ Tekshirish", callback_data="check_subs"))
     return markup
-
 
 # --- OBUNA HOLATINI TEKSHIRISH ---
 def check_user_subscriptions(message_or_call):
@@ -114,7 +110,6 @@ def check_user_subscriptions(message_or_call):
         return False
     return True
 
-
 # --- ASOSIY MENYU ---
 def main_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -124,6 +119,15 @@ def main_menu():
     )
     return markup
 
+# --- ADMIN PANEL MENYU ---
+def admin_panel_markup():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(
+        types.KeyboardButton("📣 Xabar yuborish"),
+        types.KeyboardButton("📊 Statistika"),
+        types.KeyboardButton("🏠 Asosiy menyu")
+    )
+    return markup
 
 # --- /start ---
 @bot.message_handler(commands=['start'])
@@ -140,40 +144,39 @@ Bu bot **faqat 8-sinf uchun** mo‘ljallangan.
 📚 BSB va ❗️ CHSB javoblarini olish uchun, avval quyidagi kanallarga obuna bo‘ling va “Tekshirish” tugmasini bosing ⬇️"""
     bot.send_message(message.chat.id, welcome, reply_markup=subscription_buttons())
 
+# --- /admin ---
+@bot.message_handler(commands=['admin'])
+def admin_panel(message):
+    if message.from_user.id != ADMIN_ID:
+        bot.send_message(message.chat.id, "❌ Siz admin emassiz.")
+        return
+    bot.send_message(message.chat.id, "🔐 Admin panel:", reply_markup=admin_panel_markup())
 
-# --- OBUNANI TEKSHIRISH CALLBACK ---
-@bot.callback_query_handler(func=lambda call: call.data == "check_subs")
-def check_subs(call):
-    user_id = call.from_user.id
-    not_subscribed = check_subscription_status(user_id)
-    if not_subscribed:
-        msg = "❌ Quyidagi kanallarga obuna bo‘lmagansiz:\n"
-        msg += "\n".join(f"• {name}" for name in not_subscribed)
-        markup = subscription_buttons(not_subscribed)
-        bot.answer_callback_query(call.id, "Obuna emassiz", show_alert=True)
-        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=msg, reply_markup=markup)
-    else:
-        bot.answer_callback_query(call.id, "Obuna tekshirildi ✅")
-        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                              text="✅ Siz barcha kanallarga obuna bo‘lgansiz!\nEndi botdan foydalanishingiz mumkin 🎉")
-        bot.send_message(call.message.chat.id, "Asosiy menyu:", reply_markup=main_menu())
+# --- Xabar yuborish ---
+@bot.message_handler(func=lambda m: m.text == "📣 Xabar yuborish")
+def broadcast_message_start(message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    msg = bot.send_message(message.chat.id, "📢 Yuboriladigan xabarni yozing:")
+    bot.register_next_step_handler(msg, broadcast_message_send)
 
+def broadcast_message_send(message):
+    text = message.text
+    try:
+        with open("users.txt", "r") as f:
+            users = [line.strip().split(",")[0] for line in f.read().splitlines() if line]
+    except FileNotFoundError:
+        users = []
 
-# --- BSB ---
-@bot.message_handler(func=lambda m: m.text == "BSB JAVOBLARI✅")
-def bsb_8_handler(message):
-    if not check_user_subscriptions(message): return
-    increase_message_count(message.from_user.id)
-    bot.send_message(message.chat.id, f"📚 8-sinf BSB javoblari:\n{LINKS['bsb_8']}")
+    sent = 0
+    for user_id in users:
+        try:
+            bot.send_message(user_id, text)
+            sent += 1
+        except Exception:
+            continue
 
-
-# --- CHSB ---
-@bot.message_handler(func=lambda m: m.text == "CHSB JAVOBLARI📎")
-def chsb_8_handler(message):
-    if not check_user_subscriptions(message): return
-    increase_message_count(message.from_user.id)
-    bot.send_message(message.chat.id, f"❗️ 8-sinf CHSB javoblari:\n{LINKS['chsb_8']}")
-
+    bot.send_message(message.chat.id, f"✅ Xabar {sent} foydalanuvchiga yuborildi.")
 
 # --- /stats ---
 @bot.message_handler(commands=['stats'])
@@ -202,6 +205,27 @@ def stats_handler(message):
     )
     bot.send_message(message.chat.id, stats_text, parse_mode="HTML")
 
+# --- Asosiy menyuga qaytish ---
+@bot.message_handler(func=lambda m: m.text == "🏠 Asosiy menyu")
+def return_main_menu(message):
+    if message.from_user.id == ADMIN_ID:
+        bot.send_message(message.chat.id, "🔐 Admin panel:", reply_markup=admin_panel_markup())
+    else:
+        bot.send_message(message.chat.id, "Asosiy menyu:", reply_markup=main_menu())
+
+# --- BSB ---
+@bot.message_handler(func=lambda m: m.text == "BSB JAVOBLARI✅")
+def bsb_8_handler(message):
+    if not check_user_subscriptions(message): return
+    increase_message_count(message.from_user.id)
+    bot.send_message(message.chat.id, f"📚 8-sinf BSB javoblari:\n{LINKS['bsb_8']}")
+
+# --- CHSB ---
+@bot.message_handler(func=lambda m: m.text == "CHSB JAVOBLARI📎")
+def chsb_8_handler(message):
+    if not check_user_subscriptions(message): return
+    increase_message_count(message.from_user.id)
+    bot.send_message(message.chat.id, f"❗️ 8-sinf CHSB javoblari:\n{LINKS['chsb_8']}")
 
 # --- BARCHA XABARLARDA / KOMANDA TEKSHIRISH ---
 @bot.message_handler(content_types=['text'])
@@ -210,14 +234,12 @@ def message_counter(message):
         return
     increase_message_count(message.from_user.id)
 
-
 # --- WEBHOOK ---
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
     update = telebot.types.Update.de_json(request.get_data().decode("utf-8"))
     bot.process_new_updates([update])
     return jsonify({"status": "ok"})
-
 
 # --- WEBHOOK O‘RNATISH ---
 def set_webhook():
@@ -229,7 +251,6 @@ def set_webhook():
     else:
         logger.error("Webhook o‘rnatilmadi")
 
-
 # --- MAIN ---
 def main():
     set_webhook()
@@ -237,7 +258,5 @@ def main():
     logger.info(f"Server {port}-portda ishga tushdi")
     app.run(host="0.0.0.0", port=port)
 
-
 if __name__ == "__main__":
     main()
-
