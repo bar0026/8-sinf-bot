@@ -296,16 +296,23 @@ def index():
     return "Bot ishlamoqda!"
 
 # ==================== MAIN ====================
-def set_webhook():
-    url = f"https://eight-sinf-bot.onrender.com/{BOT_TOKEN}"
-    bot.remove_webhook()
-    time.sleep(1)
-    if bot.set_webhook(url):
-        logger.info("Webhook muvaffaqiyatli o‘rnatildi!")
-    else:
-        logger.error("Webhook o‘rnatilmadi!")
 
-if __name__ == "__main__":
+# --- WEBHOOK O‘RNATISH ---
+def set_webhook():
+    webhook_url = f"https://eight-sinf-bot.onrender.com/{BOT_TOKEN}"  # ← domeningizni yozing
+    bot.remove_webhook()
+    result = bot.set_webhook(url=webhook_url)
+    if result:
+        logger.info(f"Webhook set to {webhook_url}")
+    else:
+        logger.error("Webhook o‘rnatilmadi")
+
+# --- MAIN ---
+def main():
     set_webhook()
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False) 
+    logger.info(f"Server {port}-portda ishga tushdi")
+    app.run(host="0.0.0.0", port=port)
+
+if __name__ == "__main__":
+    main()
