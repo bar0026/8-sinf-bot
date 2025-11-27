@@ -22,6 +22,7 @@ REQUIRED_CHANNELS = [
     {"name": "1-kanal", "username": "@bsb_chsb_javoblari1"},
     {"name": "2-kanal", "username": "@bsb_chsb_8_sinf_uchun"},
     {"name": "3-kanal", "username": "@chsb_original"},
+    {"name": "4-kanal", "username": "@kulishamiz_keling"},
 ]
 
 # --- LINKLAR ---
@@ -308,3 +309,4 @@ if __name__ == "__main__":
     set_webhook()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
+
