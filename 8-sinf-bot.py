@@ -297,7 +297,7 @@ def index():
 
 # ==================== MAIN ====================
 def set_webhook():
-    url = f"https://eightsinfbot.onrender.com/{BOT_TOKEN}"
+    url = f"https://eight-sinf-bot.onrender.com/{BOT_TOKEN}"
     bot.remove_webhook()
     time.sleep(1)
     if bot.set_webhook(url):
@@ -309,6 +309,7 @@ if __name__ == "__main__":
     set_webhook()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
+
 
 
 
