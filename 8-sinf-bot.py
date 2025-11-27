@@ -237,7 +237,7 @@ def webhook():
 
 # --- WEBHOOK O‘RNATISH ---
 def set_webhook():
-    webhook_url = f"https://eightsinfbot.onrender.com/{BOT_TOKEN}"  # ← domeningizni yozing
+    webhook_url = f"https://eight-sinf-bot.onrender.com/{BOT_TOKEN}"  # ← domeningizni yozing
     bot.remove_webhook()
     result = bot.set_webhook(url=webhook_url)
     if result:
@@ -254,3 +254,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
