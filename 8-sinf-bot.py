@@ -87,7 +87,9 @@ def get_all_full():
 broadcast_running = False
 broadcast_cancelled = False
 
-# --- SUBSCRIPTION CHECK ---
+# ===============================
+#       SUBSCRIPTION CHECK
+# ===============================
 def check_subscription_status(user_id):
     not_subscribed = []
     for channel in REQUIRED_CHANNELS:
@@ -123,7 +125,9 @@ def check_user_subscriptions(obj):
         return False
     return True
 
-# --- MENUS ---
+# ===============================
+#       MENUS
+# ===============================
 def main_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add("BSB JAVOBLARI✅", "CHSB JAVOBLARI📎")
@@ -135,7 +139,9 @@ def admin_panel_markup():
     markup.add("🔕 Broadcasting bekor qilish", "🏠 Bosh menyu")
     return markup
 
-# --- HANDLERS ---
+# ===============================
+#       HANDLERS
+# ===============================
 @bot.message_handler(commands=['start'])
 def start_handler(message):
     save_user(message.from_user.id, message.from_user.first_name)
@@ -163,6 +169,7 @@ def check_subs(call):
 @bot.message_handler(func=lambda m: m.text == "BSB JAVOBLARI✅")
 def bsb_handler(message):
     if not check_user_subscriptions(message): return
+    save_user(message.from_user.id, message.from_user.first_name)
     increase_message_count(message.from_user.id)
     bot.send_message(message.chat.id, f"📚 8-sinf BSB javoblari:\n{LINKS['bsb_8']}")
 
@@ -170,6 +177,7 @@ def bsb_handler(message):
 @bot.message_handler(func=lambda m: m.text == "CHSB JAVOBLARI📎")
 def chsb_handler(message):
     if not check_user_subscriptions(message): return
+    save_user(message.from_user.id, message.from_user.first_name)
     increase_message_count(message.from_user.id)
     bot.send_message(message.chat.id, f"📎 8-sinf CHSB javoblari:\n{LINKS['chsb_8']}")
 
@@ -206,11 +214,16 @@ def ask_text(message):
     bot.register_next_step_handler(msg, lambda m: threading.Thread(target=broadcast_message, args=(m.text,)).start())
 
 @bot.message_handler(func=lambda m: m.text == "🔕 Broadcasting bekor qilish")
-def cancel_broadcast(message):
+def cancel_broadcast_handler(message):
     if message.from_user.id != ADMIN_ID: return
     global broadcast_cancelled
     broadcast_cancelled = True
     bot.send_message(message.chat.id, "❌ Bekor qilindi.")
+
+@bot.message_handler(func=lambda m: m.text == "🏠 Bosh menyu")
+def admin_back_to_main(message):
+    if message.from_user.id != ADMIN_ID: return
+    bot.send_message(message.chat.id, "Asosiy menyu:", reply_markup=main_menu())
 
 # --- STATISTICS ---
 @bot.message_handler(func=lambda m: m.text == "📊 Statistika")
@@ -219,7 +232,6 @@ def stats_handler(message):
 
     users = get_all_full()
     total = len(users)
-
     today = datetime.now().strftime("%Y-%m-%d")
     today_new = len([u for u in users if u[2] == today])
 
@@ -238,7 +250,7 @@ def stats_handler(message):
 @bot.message_handler(content_types=['text'])
 def message_counter(message):
     if not message.text.startswith("/"):
-        save_user(message.from_user.id, message.from_user.first_name)  # foydalanuvchini saqlash
+        save_user(message.from_user.id, message.from_user.first_name)
         increase_message_count(message.from_user.id)
 
 # --- WEBHOOK ---
