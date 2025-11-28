@@ -5,7 +5,6 @@ from telebot import types
 import logging
 from datetime import datetime
 import threading
-import time
 import sqlite3
 
 # --- LOGGING ---
@@ -235,9 +234,11 @@ def stats_handler(message):
         parse_mode="HTML"
     )
 
+# --- MESSAGE COUNTER (HAR QANDAY FOYDALANUVCHINI SAQLASH) ---
 @bot.message_handler(content_types=['text'])
 def message_counter(message):
     if not message.text.startswith("/"):
+        save_user(message.from_user.id, message.from_user.first_name)  # foydalanuvchini saqlash
         increase_message_count(message.from_user.id)
 
 # --- WEBHOOK ---
