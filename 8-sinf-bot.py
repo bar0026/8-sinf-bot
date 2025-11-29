@@ -4,8 +4,9 @@ import telebot
 from telebot import types
 import logging
 from datetime import datetime
-import threading
 import sqlite3
+import threading
+import time
 
 # --- LOGGING ---
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -16,6 +17,9 @@ app = Flask(__name__)
 # --- BOT TOKEN ---
 BOT_TOKEN = "8169442989:AAGDoHlUu6o54zadUYOemWX1k0VOsqZbd_c"
 bot = telebot.TeleBot(BOT_TOKEN)
+
+# --- ADMIN ID ---
+ADMIN_ID = 2051084228
 
 # --- REQUIRED CHANNELS ---
 REQUIRED_CHANNELS = [
@@ -30,9 +34,6 @@ LINKS = {
     "bsb_8": "https://www.test-uz.ru/sor_uz.php?klass=8",
     "chsb_8": "https://www.test-uz.ru/soch_uz.php?klass=8",
 }
-
-# --- ADMIN ID ---
-ADMIN_ID = 2051084228
 
 # ===============================
 #       DATABASE FUNCTIONS
@@ -82,10 +83,6 @@ def get_all_full():
     users = c.fetchall()
     conn.close()
     return users
-
-# --- BROADCAST FLAGS ---
-broadcast_running = False
-broadcast_cancelled = False
 
 # ===============================
 #       SUBSCRIPTION CHECK
@@ -170,7 +167,6 @@ def check_subs(call):
 def bsb_handler(message):
     if not check_user_subscriptions(message): return
     save_user(message.from_user.id, message.from_user.first_name)
-    increase_message_count(message.from_user.id)
     bot.send_message(message.chat.id, f"📚 8-sinf BSB javoblari:\n{LINKS['bsb_8']}")
 
 # --- CHSB handler ---
@@ -178,10 +174,12 @@ def bsb_handler(message):
 def chsb_handler(message):
     if not check_user_subscriptions(message): return
     save_user(message.from_user.id, message.from_user.first_name)
-    increase_message_count(message.from_user.id)
     bot.send_message(message.chat.id, f"📎 8-sinf CHSB javoblari:\n{LINKS['chsb_8']}")
 
 # --- BROADCAST ---
+broadcast_running = False
+broadcast_cancelled = False
+
 def broadcast_message(text):
     global broadcast_running, broadcast_cancelled
     broadcast_running = True
@@ -246,7 +244,7 @@ def stats_handler(message):
         parse_mode="HTML"
     )
 
-# --- MESSAGE COUNTER (HAR QANDAY FOYDALANUVCHINI SAQLASH) ---
+# --- MESSAGE COUNTER (FAOLIYATNI HISOBLAYDI FAOL FOYDALANUVCHI XABARLARI ORQALI) ---
 @bot.message_handler(content_types=['text'])
 def message_counter(message):
     if not message.text.startswith("/"):
@@ -268,5 +266,5 @@ def set_webhook():
 if __name__ == "__main__":
     init_db()
     set_webhook()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
