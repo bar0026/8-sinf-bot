@@ -20,7 +20,7 @@ bot = telebot.TeleBot(BOT_TOKEN)
 ADMIN_ID = 2051084228
 
 # --- MONGODB ---
-MONGO_URI = "mongodb+srv://bar2606:<db_password>@8-sinf-bot.yxrsvne.mongodb.net/?appName=8-sinf-bot"
+MONGO_URI = "mongodb+srv://bar2606:<asilbek0026>@8-sinf-bot.yxrsvne.mongodb.net/?appName=8-sinf-bot"
 client = MongoClient(MONGO_URI)
 db = client["telegram_bot"]
 users_col = db["users"]
@@ -196,3 +196,4 @@ if __name__ == "__main__":
     set_webhook()
     port = int(os.environ.get("PORT",5000))
     app.run(host="0.0.0.0",port=port)
+
