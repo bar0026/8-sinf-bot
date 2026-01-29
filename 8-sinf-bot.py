@@ -4,19 +4,17 @@ import telebot
 from telebot import types
 import logging
 from datetime import datetime
-import threading
 from pymongo import MongoClient
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO)
 
+# --- FLASK ---
 app = Flask(__name__)
 
-# --- TOKEN --
-BOT_TOKEN = "8169442989:AAGDoHlUu6o54zadUYOemWX1k0VOsqZbd_c"
-bot = telebot.TeleBot(BOT_TOKEN)
-
-# --- ADMIN ---
+BOT_TOKEN = "8169442989:AAGDoHlUu6o54zadUYOemWX1k0VOsqZbd_c" 
+bot = telebot.TeleBot(BOT_TOKEN) 
+# --- ADMIN --- 
 ADMIN_ID = 2051084228
 
 # --- MONGODB ---
@@ -25,7 +23,7 @@ client = MongoClient(MONGO_URI)
 db = client["telegram_bot"]
 users_col = db["users"]
 
-# --- CHANNELS ---
+# --- REQUIRED CHANNELS ---
 REQUIRED_CHANNELS = [
     {"name": "1-kanal", "username": "@bsb_chsb_javoblari1"},
     {"name": "2-kanal", "username": "@bsb_chsb_8_sinf_uchun"},
@@ -39,12 +37,11 @@ LINKS = {
 }
 
 # ======================
-# DATABASE
+# DATABASE FUNCTIONS
 # ======================
 
 def save_user(user_id, first_name):
     today = datetime.now().strftime("%Y-%m-%d")
-
     users_col.update_one(
         {"user_id": user_id},
         {"$setOnInsert": {
@@ -69,33 +66,32 @@ def get_all_full():
     return list(users_col.find())
 
 # ======================
-# SUB CHECK
+# SUBSCRIPTION CHECK
 # ======================
 
 def check_subscription_status(user_id):
     not_sub = []
     for ch in REQUIRED_CHANNELS:
         try:
-            m = bot.get_chat_member(ch["username"], user_id)
-            if m.status not in ["member","administrator","creator"]:
+            member = bot.get_chat_member(ch["username"], user_id)
+            if member.status not in ["member","administrator","creator"]:
                 not_sub.append(ch["name"])
         except:
             not_sub.append(ch["name"])
     return not_sub
 
 def subscription_buttons(not_sub=None):
-    m = types.InlineKeyboardMarkup()
+    markup = types.InlineKeyboardMarkup()
     channels = REQUIRED_CHANNELS if not_sub is None else \
         [c for c in REQUIRED_CHANNELS if c["name"] in not_sub]
 
     for ch in channels:
-        m.add(types.InlineKeyboardButton(
-            ch["name"],
-            url=f"https://t.me/{ch['username'][1:]}"
+        markup.add(types.InlineKeyboardButton(
+            ch["name"], url=f"https://t.me/{ch['username'][1:]}"
         ))
 
-    m.add(types.InlineKeyboardButton("✅ Tekshirish", callback_data="check_subs"))
-    return m
+    markup.add(types.InlineKeyboardButton("✅ Tekshirish", callback_data="check_subs"))
+    return markup
 
 def check_user_subscriptions(obj):
     uid = obj.from_user.id
@@ -108,15 +104,15 @@ def check_user_subscriptions(obj):
         markup = subscription_buttons(not_sub)
 
         if hasattr(obj,"message"):
-            bot.answer_callback_query(obj.id,"Obuna bo‘ling!",show_alert=True)
-            bot.edit_message_text(msg,chat_id,obj.message.message_id,reply_markup=markup)
+            bot.answer_callback_query(obj.id, "Obuna bo‘ling!", show_alert=True)
+            bot.edit_message_text(msg, chat_id, obj.message.message_id, reply_markup=markup)
         else:
-            bot.send_message(chat_id,msg,reply_markup=markup)
+            bot.send_message(chat_id, msg, reply_markup=markup)
         return False
     return True
 
 # ======================
-# MENU
+# MAIN MENU
 # ======================
 
 def main_menu():
@@ -130,27 +126,37 @@ def main_menu():
 
 @bot.message_handler(commands=['start'])
 def start_handler(message):
-    save_user(message.from_user.id,message.from_user.first_name)
+    save_user(message.from_user.id, message.from_user.first_name)
     bot.send_message(
         message.chat.id,
         "📚 Avval kanallarga obuna bo‘ling:",
         reply_markup=subscription_buttons()
     )
 
-@bot.callback_query_handler(func=lambda c:c.data=="check_subs")
+@bot.callback_query_handler(func=lambda c: c.data=="check_subs")
 def check_subs(call):
     if check_user_subscriptions(call):
-        bot.send_message(call.message.chat.id,"✅ Tasdiqlandi!",reply_markup=main_menu())
+        bot.send_message(call.message.chat.id, "✅ Tasdiqlandi!", reply_markup=main_menu())
 
-@bot.message_handler(func=lambda m:m.text=="BSB JAVOBLARI✅")
+@bot.message_handler(func=lambda m: m.text=="BSB JAVOBLARI✅")
 def bsb(message):
     if not check_user_subscriptions(message): return
-    bot.send_message(message.chat.id,LINKS["bsb_8"])
+    bot.send_message(message.chat.id, LINKS["bsb_8"])
 
-@bot.message_handler(func=lambda m:m.text=="CHSB JAVOBLARI📎")
+@bot.message_handler(func=lambda m: m.text=="CHSB JAVOBLARI📎")
 def chsb(message):
     if not check_user_subscriptions(message): return
-    bot.send_message(message.chat.id,LINKS["chsb_8"])
+    bot.send_message(message.chat.id, LINKS["chsb_8"])
+
+# ======================
+# MESSAGE COUNTER
+# ======================
+
+@bot.message_handler(content_types=['text'])
+def counter(message):
+    if not message.text.startswith("/"):
+        save_user(message.from_user.id, message.from_user.first_name)
+        increase_message_count(message.from_user.id)
 
 # ======================
 # BROADCAST
@@ -160,19 +166,9 @@ def broadcast_message(text):
     users = get_all_users()
     for uid in users:
         try:
-            bot.send_message(uid,text)
+            bot.send_message(uid, text)
         except:
             pass
-
-# ======================
-# MESSAGE COUNTER
-# ======================
-
-@bot.message_handler(content_types=['text'])
-def counter(message):
-    if not message.text.startswith("/"):
-        save_user(message.from_user.id,message.from_user.first_name)
-        increase_message_count(message.from_user.id)
 
 # ======================
 # WEBHOOK
@@ -186,7 +182,7 @@ def webhook():
 
 def set_webhook():
     bot.remove_webhook()
-    bot.set_webhook(url=f"https://eight-sinf-bot.onrender.com/{BOT_TOKEN}")
+    bot.set_webhook(url=f"https://eight-sinf-bot.onrender.com')}/{BOT_TOKEN}")
 
 # ======================
 # MAIN
@@ -194,7 +190,5 @@ def set_webhook():
 
 if __name__ == "__main__":
     set_webhook()
-    port = int(os.environ.get("PORT",5000))
-    app.run(host="0.0.0.0",port=port)
-
-
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
