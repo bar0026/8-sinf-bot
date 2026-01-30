@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
 
 # ======================
-# BOT TOKEN
+# BOT
 # ======================
 BOT_TOKEN = "8169442989:AAGDoHlUu6o54zadUYOemWX1k0VOsqZbd_c"
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="html")
@@ -36,13 +36,11 @@ MONGO_URI = "mongodb+srv://bar2606:asilbek0026-sinf-bot.yxrsvne.mongodb.net/?app
 try:
     client = MongoClient(MONGO_URI)
     client.admin.command("ping")
-    logging.info("MongoDB connected successfully")
-
     db = client["telegram_bot"]
     users_col = db["users"]
-
+    logging.info("MongoDB connected")
 except Exception as e:
-    logging.error(f"MongoDB connection failed: {e}")
+    logging.error(e)
     users_col = None
 
 # ======================
@@ -61,138 +59,176 @@ LINKS = {
 }
 
 # ======================
-# DATABASE FUNCTIONS
+# DATABASE
 # ======================
-def save_user(user_id, first_name):
+def save_user(uid, name):
     if not users_col:
         return
     users_col.update_one(
-        {"user_id": user_id},
+        {"user_id": uid},
         {"$setOnInsert": {
-            "user_id": user_id,
-            "first_name": first_name,
+            "user_id": uid,
+            "first_name": name,
             "joined": datetime.now().strftime("%Y-%m-%d"),
             "msg_count": 0
         }},
         upsert=True
     )
 
-def increase_message_count(user_id):
-    if not users_col:
-        return
-    users_col.update_one(
-        {"user_id": user_id},
-        {"$inc": {"msg_count": 1}}
-    )
+def inc_msg(uid):
+    if users_col:
+        users_col.update_one({"user_id": uid}, {"$inc": {"msg_count": 1}})
 
-def get_all_users():
+def get_users():
     if not users_col:
         return []
     return [u["user_id"] for u in users_col.find({}, {"user_id": 1})]
 
 # ======================
-# SUBSCRIPTION CHECK
+# SUB CHECK
 # ======================
-def check_subscription_status(user_id):
-    not_subscribed = []
+def check_sub(uid):
+    not_sub = []
     for ch in REQUIRED_CHANNELS:
         try:
-            member = bot.get_chat_member(ch["username"], user_id)
-            if member.status not in ["member", "administrator", "creator"]:
-                not_subscribed.append(ch["name"])
+            m = bot.get_chat_member(ch["username"], uid)
+            if m.status not in ["member", "administrator", "creator"]:
+                not_sub.append(ch["name"])
         except:
-            not_subscribed.append(ch["name"])
-    return not_subscribed
+            not_sub.append(ch["name"])
+    return not_sub
 
-def subscription_buttons(not_sub=None):
-    markup = types.InlineKeyboardMarkup()
+def sub_buttons(not_sub=None):
+    kb = types.InlineKeyboardMarkup()
     channels = REQUIRED_CHANNELS if not_sub is None else [
         c for c in REQUIRED_CHANNELS if c["name"] in not_sub
     ]
-
     for ch in channels:
-        markup.add(
-            types.InlineKeyboardButton(
-                ch["name"],
-                url=f"https://t.me/{ch['username'][1:]}"
-            )
-        )
+        kb.add(types.InlineKeyboardButton(
+            ch["name"],
+            url=f"https://t.me/{ch['username'][1:]}"
+        ))
+    kb.add(types.InlineKeyboardButton("✅ Tekshirish", callback_data="check_subs"))
+    return kb
 
-    markup.add(types.InlineKeyboardButton("✅ Tekshirish", callback_data="check_subs"))
-    return markup
+def check_user(obj):
+    uid = obj.from_user.id
+    cid = obj.message.chat.id if hasattr(obj, "message") else obj.chat.id
+    not_sub = check_sub(uid)
 
-def check_user_subscriptions(obj):
-    user_id = obj.from_user.id
-    chat_id = obj.message.chat.id if hasattr(obj, "message") else obj.chat.id
-
-    not_sub = check_subscription_status(user_id)
     if not_sub:
         text = "❌ Avval obuna bo‘ling:\n" + "\n".join(not_sub)
-        markup = subscription_buttons(not_sub)
-
         if hasattr(obj, "message"):
             bot.answer_callback_query(obj.id, "Obuna bo‘ling!", show_alert=True)
-            bot.edit_message_text(text, chat_id, obj.message.message_id, reply_markup=markup)
+            bot.edit_message_text(text, cid, obj.message.message_id, reply_markup=sub_buttons(not_sub))
         else:
-            bot.send_message(chat_id, text, reply_markup=markup)
+            bot.send_message(cid, text, reply_markup=sub_buttons(not_sub))
         return False
     return True
 
 # ======================
-# MENU
+# MENUS
 # ======================
 def main_menu():
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("BSB JAVOBLARI✅", "CHSB JAVOBLARI📎")
-    return markup
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add("BSB JAVOBLARI✅", "CHSB JAVOBLARI📎")
+    return kb
+
+def admin_menu():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add("👥 Foydalanuvchilar soni")
+    kb.add("📢 Xabar yuborish")
+    kb.add("⬅️ Ortga")
+    return kb
 
 # ======================
 # HANDLERS
 # ======================
 @bot.message_handler(commands=["start"])
-def start_handler(message):
+def start(message):
     save_user(message.from_user.id, message.from_user.first_name)
     bot.send_message(
         message.chat.id,
         "📚 Avval kanallarga obuna bo‘ling:",
-        reply_markup=subscription_buttons()
+        reply_markup=sub_buttons()
     )
 
 @bot.callback_query_handler(func=lambda c: c.data == "check_subs")
-def check_subs(call):
-    if check_user_subscriptions(call):
+def checksubs(call):
+    if check_user(call):
         bot.send_message(call.message.chat.id, "✅ Tasdiqlandi!", reply_markup=main_menu())
 
+@bot.message_handler(commands=["admin"])
+def admin(message):
+    if message.from_user.id != ADMIN_ID:
+        bot.send_message(message.chat.id, "⛔ Siz admin emassiz!")
+        return
+    bot.send_message(message.chat.id, "🔐 Admin panel", reply_markup=admin_menu())
+
+@bot.message_handler(func=lambda m: m.text == "👥 Foydalanuvchilar soni")
+def users_count(message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    count = users_col.count_documents({}) if users_col else 0
+    bot.send_message(message.chat.id, f"👥 Jami foydalanuvchilar: <b>{count}</b>")
+
+@bot.message_handler(func=lambda m: m.text == "📢 Xabar yuborish")
+def ask_broadcast(message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    msg = bot.send_message(message.chat.id, "✍️ Yuboriladigan xabarni kiriting:")
+    bot.register_next_step_handler(msg, send_broadcast)
+
+def send_broadcast(message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    sent = 0
+    for uid in get_users():
+        try:
+            bot.send_message(uid, message.text)
+            sent += 1
+        except:
+            pass
+    bot.send_message(
+        message.chat.id,
+        f"✅ Xabar yuborildi\n📤 Yuborildi: {sent}",
+        reply_markup=admin_menu()
+    )
+
+@bot.message_handler(func=lambda m: m.text == "⬅️ Ortga")
+def back(message):
+    bot.send_message(message.chat.id, "🏠 Asosiy menyu", reply_markup=main_menu())
+
 @bot.message_handler(func=lambda m: m.text == "BSB JAVOBLARI✅")
-def bsb_handler(message):
-    if check_user_subscriptions(message):
+def bsb(message):
+    if check_user(message):
         bot.send_message(message.chat.id, LINKS["bsb_8"])
 
 @bot.message_handler(func=lambda m: m.text == "CHSB JAVOBLARI📎")
-def chsb_handler(message):
-    if check_user_subscriptions(message):
+def chsb(message):
+    if check_user(message):
         bot.send_message(message.chat.id, LINKS["chsb_8"])
 
 @bot.message_handler(content_types=["text"])
-def message_counter(message):
+def counter(message):
     if not message.text.startswith("/"):
         save_user(message.from_user.id, message.from_user.first_name)
-        increase_message_count(message.from_user.id)
+        inc_msg(message.from_user.id)
 
 # ======================
 # WEBHOOK
 # ======================
 @app.route(f"/{BOT_TOKEN}", methods=["POST"])
 def webhook():
-    update = telebot.types.Update.de_json(request.get_data().decode("utf-8"))
+    update = telebot.types.Update.de_json(request.get_data().decode())
     bot.process_new_updates([update])
-    return jsonify({"ok": True})
+    return jsonify(ok=True)
 
 def set_webhook():
-    render_url = "https://eight-sinf-bot.onrender.com"
+    url = "https://eight-sinf-bot.onrender.com"
     bot.remove_webhook()
-    bot.set_webhook(url=f"{render_url}/{BOT_TOKEN}")
-    logging.info("Webhook set successfully")
+    bot.set_webhook(url=f"{url}/{BOT_TOKEN}")
+    logging.info("Webhook set")
 
 # ======================
 # MAIN
