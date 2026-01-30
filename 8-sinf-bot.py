@@ -114,8 +114,8 @@ def sub_buttons(not_sub=None):
 def check_user(obj):
     uid = obj.from_user.id
     cid = obj.message.chat.id if hasattr(obj, "message") else obj.chat.id
-    not_sub = check_sub(uid)
 
+    not_sub = check_sub(uid)
     if not_sub:
         text = "❌ Avval obuna bo‘ling:\n" + "\n".join(not_sub)
         if hasattr(obj, "message"):
@@ -147,6 +147,7 @@ def admin_menu():
 @bot.message_handler(commands=["start"])
 def start(message):
     save_user(message.from_user.id, message.from_user.first_name)
+    inc_msg(message.from_user.id)
     bot.send_message(
         message.chat.id,
         "📚 Avval kanallarga obuna bo‘ling:",
@@ -155,11 +156,15 @@ def start(message):
 
 @bot.callback_query_handler(func=lambda c: c.data == "check_subs")
 def checksubs(call):
+    save_user(call.from_user.id, call.from_user.first_name)
+    inc_msg(call.from_user.id)
     if check_user(call):
         bot.send_message(call.message.chat.id, "✅ Tasdiqlandi!", reply_markup=main_menu())
 
 @bot.message_handler(commands=["admin"])
 def admin(message):
+    save_user(message.from_user.id, message.from_user.first_name)
+    inc_msg(message.from_user.id)
     if message.from_user.id != ADMIN_ID:
         bot.send_message(message.chat.id, "⛔ Siz admin emassiz!")
         return
@@ -167,6 +172,8 @@ def admin(message):
 
 @bot.message_handler(func=lambda m: m.text == "👥 Foydalanuvchilar soni")
 def users_count(message):
+    save_user(message.from_user.id, message.from_user.first_name)
+    inc_msg(message.from_user.id)
     if message.from_user.id != ADMIN_ID:
         return
     count = users_col.count_documents({}) if users_col else 0
@@ -174,12 +181,16 @@ def users_count(message):
 
 @bot.message_handler(func=lambda m: m.text == "📢 Xabar yuborish")
 def ask_broadcast(message):
+    save_user(message.from_user.id, message.from_user.first_name)
+    inc_msg(message.from_user.id)
     if message.from_user.id != ADMIN_ID:
         return
     msg = bot.send_message(message.chat.id, "✍️ Yuboriladigan xabarni kiriting:")
     bot.register_next_step_handler(msg, send_broadcast)
 
 def send_broadcast(message):
+    save_user(message.from_user.id, message.from_user.first_name)
+    inc_msg(message.from_user.id)
     if message.from_user.id != ADMIN_ID:
         return
     sent = 0
@@ -197,23 +208,28 @@ def send_broadcast(message):
 
 @bot.message_handler(func=lambda m: m.text == "⬅️ Ortga")
 def back(message):
+    save_user(message.from_user.id, message.from_user.first_name)
+    inc_msg(message.from_user.id)
     bot.send_message(message.chat.id, "🏠 Asosiy menyu", reply_markup=main_menu())
 
 @bot.message_handler(func=lambda m: m.text == "BSB JAVOBLARI✅")
 def bsb(message):
+    save_user(message.from_user.id, message.from_user.first_name)
+    inc_msg(message.from_user.id)
     if check_user(message):
         bot.send_message(message.chat.id, LINKS["bsb_8"])
 
 @bot.message_handler(func=lambda m: m.text == "CHSB JAVOBLARI📎")
 def chsb(message):
+    save_user(message.from_user.id, message.from_user.first_name)
+    inc_msg(message.from_user.id)
     if check_user(message):
         bot.send_message(message.chat.id, LINKS["chsb_8"])
 
 @bot.message_handler(content_types=["text"])
 def counter(message):
-    if not message.text.startswith("/"):
-        save_user(message.from_user.id, message.from_user.first_name)
-        inc_msg(message.from_user.id)
+    save_user(message.from_user.id, message.from_user.first_name)
+    inc_msg(message.from_user.id)
 
 # ======================
 # WEBHOOK
