@@ -4,7 +4,6 @@ import telebot
 from telebot import types
 import logging
 from datetime import datetime
-import threading
 from pymongo import MongoClient
 
 # --- LOGGING ---
@@ -13,21 +12,25 @@ logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
 
 # --- TOKEN ---
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8169442989:AAGDoHlUu6o54zadUYOemWX1k0VOsqZbd_c")
+BOT_TOKEN = "8169442989:AAGDoHlUu6o54zadUYOemWX1k0VOsqZbd_c"
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="html")
 
 # --- ADMIN ---
 ADMIN_ID = 2051084228
 
 # --- MONGODB ---
-MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://bar2606:password@8-sinf-bot.yxrsvne.mongodb.net/?appName=8-sinf-bot")
+MONGO_URI = "mongodb+srv://bar2606:Parol123@8-sinf-bot.yxrsvne.mongodb.net/?appName=8-sinf-bot"
+
 try:
     client = MongoClient(MONGO_URI)
     client.admin.command('ping')
+    logging.info("MongoDB connected successfully")
+    db = client["telegram_bot"]
+    users_col = db["users"]
 except Exception as e:
     logging.error(f"MongoDB connection failed: {e}")
-db = client["telegram_bot"]
-users_col = db["users"]
+    db = None
+    users_col = None
 
 # --- CHANNELS ---
 REQUIRED_CHANNELS = [
@@ -47,30 +50,59 @@ LINKS = {
 # ======================
 
 def save_user(user_id, first_name):
-    today = datetime.now().strftime("%Y-%m-%d")
-
-    users_col.update_one(
-        {"user_id": user_id},
-        {"$setOnInsert": {
-            "user_id": user_id,
-            "first_name": first_name,
-            "joined": today,
-            "msg_count": 0
-        }},
-        upsert=True
-    )
+    if not users_col:
+        logging.warning("Database not connected, skipping save_user")
+        return
+    
+    try:
+        today = datetime.now().strftime("%Y-%m-%d")
+        users_col.update_one(
+            {"user_id": user_id},
+            {"$setOnInsert": {
+                "user_id": user_id,
+                "first_name": first_name,
+                "joined": today,
+                "msg_count": 0
+            }},
+            upsert=True
+        )
+    except Exception as e:
+        logging.error(f"Error saving user {user_id}: {e}")
 
 def increase_message_count(user_id):
-    users_col.update_one(
-        {"user_id": user_id},
-        {"$inc": {"msg_count": 1}}
-    )
+    if not users_col:
+        logging.warning("Database not connected, skipping increase_message_count")
+        return
+    
+    try:
+        users_col.update_one(
+            {"user_id": user_id},
+            {"$inc": {"msg_count": 1}}
+        )
+    except Exception as e:
+        logging.error(f"Error increasing message count for {user_id}: {e}")
 
 def get_all_users():
-    return [u["user_id"] for u in users_col.find({}, {"user_id":1})]
+    if not users_col:
+        logging.warning("Database not connected, returning empty list")
+        return []
+    
+    try:
+        return [u["user_id"] for u in users_col.find({}, {"user_id":1})]
+    except Exception as e:
+        logging.error(f"Error getting all users: {e}")
+        return []
 
 def get_all_full():
-    return list(users_col.find())
+    if not users_col:
+        logging.warning("Database not connected, returning empty list")
+        return []
+    
+    try:
+        return list(users_col.find())
+    except Exception as e:
+        logging.error(f"Error getting all users data: {e}")
+        return []
 
 # ======================
 # SUB CHECK
@@ -108,11 +140,11 @@ def check_user_subscriptions(obj):
     not_sub = check_subscription_status(uid)
 
     if not_sub:
-        msg = "❌ Avval obuna bo‘ling:\n" + "\n".join(not_sub)
+        msg = "❌ Avval obuna bo'ling:\n" + "\n".join(not_sub)
         markup = subscription_buttons(not_sub)
 
         if hasattr(obj,"message"):
-            bot.answer_callback_query(obj.id,"Obuna bo‘ling!",show_alert=True)
+            bot.answer_callback_query(obj.id,"Obuna bo'ling!",show_alert=True)
             bot.edit_message_text(msg,chat_id,obj.message.message_id,reply_markup=markup)
         else:
             bot.send_message(chat_id,msg,reply_markup=markup)
@@ -137,9 +169,31 @@ def start_handler(message):
     save_user(message.from_user.id,message.from_user.first_name)
     bot.send_message(
         message.chat.id,
-        "📚 Avval kanallarga obuna bo‘ling:",
+        "📚 Avval kanallarga obuna bo'ling:",
         reply_markup=subscription_buttons()
     )
+
+@bot.message_handler(commands=['stat'])
+def stat_handler(message):
+    # Admin check (optional, but requested implicitly by context of "statistics")
+    # If open to all, remove the if check. Assuming ADMIN_ID is set.
+    if message.from_user.id != ADMIN_ID:
+        return
+
+    if not users_col:
+        bot.send_message(message.chat.id, "❌ Bazaga ulanish yo'q")
+        return
+
+    try:
+        total_users = users_col.count_documents({})
+        today = datetime.now().strftime("%Y-%m-%d")
+        today_users = users_col.count_documents({"joined": today})
+        
+        msg = f"📊 <b>Bot Statistikasi:</b>\n\n👤 Jami foydalanuvchilar: {total_users}\n📅 Bugun qo'shilganlar: {today_users}"
+        bot.send_message(message.chat.id, msg)
+    except Exception as e:
+        logging.error(f"Stat error: {e}")
+        bot.send_message(message.chat.id, "❌ Statistikani olishda xatolik")
 
 @bot.callback_query_handler(func=lambda c:c.data=="check_subs")
 def check_subs(call):
@@ -189,14 +243,11 @@ def webhook():
     return jsonify({"ok": True})
 
 def set_webhook():
-    render_url = os.environ.get("h6ttps://eight-sinf-bot.onrender.com")
-    if not render_url:
-        logging.warning("RENDER_URL not set. Webhook not configured.")
-        return
+    render_url = "https://eight-sinf-bot.onrender.com"
     
     try:
         bot.remove_webhook()
-        webhook_url = f"{https://eight-sinf-bot.onrender.com}/{BOT_TOKEN}"
+        webhook_url = f"{render_url}/{BOT_TOKEN}"
         bot.set_webhook(url=webhook_url)
         logging.info(f"Webhook set to: {webhook_url}")
     except Exception as e:
@@ -211,3 +262,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     logging.info(f"Starting bot on port {port}")
     app.run(host="0.0.0.0", port=port, debug=False)
+
