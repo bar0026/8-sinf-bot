@@ -19,7 +19,7 @@ bot = telebot.TeleBot(BOT_TOKEN, parse_mode="html")
 ADMIN_ID = 2051084228
 
 # --- MONGODB ---
-MONGO_URI = "mongodb+srv://bar2606:Parol123@8-sinf-bot.yxrsvne.mongodb.net/?appName=8-sinf-bot"
+MONGO_URI = "mongodb+srv://bar2606:asilbek0026-sinf-bot.yxrsvne.mongodb.net/?appName=8-sinf-bot"
 
 try:
     client = MongoClient(MONGO_URI)
@@ -425,4 +425,5 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     logging.info(f"Starting bot on port {port}")
     app.run(host="0.0.0.0", port=port, debug=False)
+
 
