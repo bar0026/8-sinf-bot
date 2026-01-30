@@ -240,13 +240,6 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     logging.info(f"Starting bot on port {port}")
     app.run(host="0.0.0.0", port=port, debug=False)
-
-# ======================
-# DATABASE
-# ======================
-
-def save_user(user_id, first_name):
-    if not users_col:
         logging.warning("Database not connected, skipping save_user")
         return
     
