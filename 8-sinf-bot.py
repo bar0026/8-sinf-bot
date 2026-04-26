@@ -25,7 +25,7 @@ REQUIRED_CHANNELS = [
     {"name": "1-kanal", "username": "@bsb_chsb_javoblari1"},
     {"name": "2-kanal", "username": "@bsb_chsb_8_sinf_uchun"},
     {"name": "3-kanal", "username": "@chsb_original"},
-    {"name": "4-kanal", "username": "@kulishamiz_keling"},
+
 ]
 
 # --- LINKS ---
