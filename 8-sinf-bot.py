@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-BOT_TOKEN = "8346801600:AAGwVSdfvls42KHFtXwbcZhPzBNVEg8rU9g"
+BOT_TOKEN = "8169442989:AAGDoHlUu6o54zadUYOemWX1k0VOsqZbd_c"
 bot = telebot.TeleBot(BOT_TOKEN)
 
 ADMIN_ID = 2051084228
@@ -292,7 +292,7 @@ def webhook():
     return jsonify({"status": "ok"})
 
 def set_webhook():
-    url = f"https://mytelegrammbottest.onrender.com/ {BOT_TOKEN}"
+    url = f"https://eight-sinf-bot.onrender.com/ {BOT_TOKEN}"
     bot.remove_webhook()
     time.sleep(1)
     bot.set_webhook(url=url)
